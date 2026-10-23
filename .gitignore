@@ -3,3 +3,9 @@
 __pycache__/
 .pytest_cache/
 *.py[cod]
+.coverage
+htmlcov/
+dist/
+build/
+pytest.ini
+tests/

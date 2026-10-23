@@ -34,6 +34,8 @@ def extract(workbook_text: str) -> dict:
         response_format={"type": "json_object"},
         temperature=0.1,
     )
+    if not response.choices:
+        raise ValueError("Model returned no choices.")
     content = response.choices[0].message.content
     if not content:
         raise ValueError("Model returned an empty response.")
