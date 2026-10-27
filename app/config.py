@@ -18,3 +18,14 @@ FRONTEND_ORIGINS = [
     for origin in os.getenv("FRONTEND_ORIGINS", "*").split(",")
     if origin.strip()
 ]
+
+MSME_SKILL_PATH = ROOT / "skills" / "msme_extraction" / "SKILL.md"
+MSME_BUSINESS_TYPE = os.getenv("MSME_BUSINESS_TYPE", "services")
+MSME_NATURE = os.getenv("MSME_NATURE", "")
+MSME_PROFIT_MARGIN = float(os.getenv("MSME_PROFIT_MARGIN", "20"))
+MSME_ANALYSER_TIMEOUT = float(os.getenv("MSME_ANALYSER_TIMEOUT", "120"))
+MSME_ANALYSER_FLAGS = tuple(
+    flag for flag in os.getenv("MSME_ANALYSER_FLAGS", "-I -W ignore").split() if flag
+)
+
+REASONING_EFFORT = os.getenv("LLM_REASONING_EFFORT", "off")

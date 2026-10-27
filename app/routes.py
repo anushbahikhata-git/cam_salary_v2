@@ -6,7 +6,9 @@ from openai import APIError, APITimeoutError
 from pydantic import ValidationError
 
 from app.config import MAX_FILE_BYTES
+from app.llm.msme import extract as extract_msme
 from app.llm.salary import extract
+from app.msme_analyser import AnalyserError, AnalyserTimeout, analyse
 from app.schemas import FailureResult, Result
 from app.workbook import WorkbookError, WorkbookTooLargeError, to_text
 
@@ -84,3 +86,50 @@ async def extract_salary(file: UploadFile = File(...)):
     except Exception as exc:
         log.exception("Salary extraction failed")
         raise HTTPException(status_code=500, detail="Salary extraction failed.") from exc
+
+
+@router.post("/msme-income")
+async def extract_msme_income(file: UploadFile = File(...)):
+    filename = file.filename or ""
+
+    try:
+        if not filename.lower().endswith(".xlsx"):
+            raise HTTPException(status_code=400, detail="Upload an .xlsx CAM report.")
+
+        data = await file.read(MAX_FILE_BYTES + 1)
+        if not data:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        if len(data) > MAX_FILE_BYTES:
+            raise HTTPException(status_code=413, detail="Uploaded file exceeds the size limit.")
+    finally:
+        await file.close()
+
+    try:
+        draft = await run_in_threadpool(analyse, data, filename)
+        return await run_in_threadpool(extract_msme, draft)
+    except HTTPException:
+        raise
+    except WorkbookError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except AnalyserTimeout as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except AnalyserError as exc:
+        log.exception("MSME analyser failed: %s", exc)
+        raise HTTPException(status_code=500, detail="MSME analyser failed.") from exc
+    except APITimeoutError as exc:
+        log.warning("MSME model request timed out")
+        raise HTTPException(status_code=504, detail="MSME model request timed out.") from exc
+    except APIError as exc:
+        log.exception("MSME model request failed")
+        raise HTTPException(status_code=502, detail="MSME model request failed.") from exc
+    except ValueError as exc:
+        log.warning("MSME model returned invalid output: %s", str(exc))
+        raise HTTPException(status_code=502, detail="MSME model returned invalid output.") from exc
+    except RuntimeError as exc:
+        log.exception("MSME extraction is not configured correctly")
+        raise HTTPException(
+            status_code=500, detail="MSME extraction is not configured correctly."
+        ) from exc
+    except Exception as exc:
+        log.exception("MSME extraction failed")
+        raise HTTPException(status_code=500, detail="MSME extraction failed.") from exc
